@@ -93,10 +93,17 @@ details{margin-top:10px}summary{cursor:pointer;color:#f1a0b2;font-size:12px;font
 </div>
 <label for="goal">Mission directive</label>
 <textarea id="goal" placeholder="Example: Create a practical engineering plan to diagnose and fix crashes in my Android application. Include test criteria."></textarea>
+<label for="missionType">Deliverable format</label>
+<select id="missionType">
+<option value="auto">AUTO — runnable HTML for games/web apps; otherwise plan</option>
+<option value="webapp">PLAYABLE WEB APP — .html file</option>
+<option value="analysis">ANALYSIS — text report only</option>
+</select>
+<p class="small" id="typeHint" style="margin-top:8px">For simple browser games and interactive pages, AUTO creates an exportable playable HTML file. Native APKs require a separate build environment.</p>
 <label for="missionProvider">Inference provider</label>
 <select id="missionProvider"><option value="gemini">Google Gemini</option><option value="groq">Groq</option></select>
 <div class="action-row" style="margin-top:13px"><button id="launchBtn" onclick="launchMission()">▶ DEPLOY AGENT TEAM</button><button id="cancelBtn" class="secondary" onclick="Crimson.cancelMission()" style="display:none">STOP</button></div>
-<p class="small" style="margin-top:10px">Requires an API key. Three model calls per mission; free quotas and rate limits apply. Keep the app open while running.</p>
+<p class="small" style="margin-top:10px">Requires an API key. Three model calls per mission; free quotas and output limits apply. Keep the app open while running. Runnable HTML is generated code, not guaranteed bug-free.</p>
 </div>
 <div class="widegrid">
 <div class="card"><div class="heading"><h2>◈ Provider readiness</h2></div><div id="providerStatus" class="agents"></div><button class="secondary wide" onclick="showTab('vault')" style="margin-top:13px">MANAGE CREDENTIALS ↗</button></div>
@@ -107,7 +114,12 @@ details{margin-top:10px}summary{cursor:pointer;color:#f1a0b2;font-size:12px;font
 <div class="overline">AUTONOMOUS TEAM // LIVE RUN</div><h1>Mission <em>control.</em></h1>
 <p class="lead">One task. Three specialist AI role passes. Auditable results, without pretending any external code was executed.</p>
 <div class="card"><div class="heading"><h2>Live agent pipeline</h2><span id="runBadge" class="badge gray">IDLE</span></div><div class="agents"><div class="agent"><span>01</span><div><b>Strategist</b><small>Decompose the objective</small></div><div id="stage1" class="state">WAITING</div></div><div class="agent"><span>02</span><div><b>Specialist</b><small>Produce the deliverable</small></div><div id="stage2" class="state">WAITING</div></div><div class="agent"><span>03</span><div><b>Quality auditor</b><small>Critique and refine</small></div><div id="stage3" class="state">WAITING</div></div></div>
-<div class="heading" style="margin:19px 0 8px"><h2>Live output</h2><button class="tiny outline" onclick="copyOutput()">COPY</button></div><pre id="missionOutput" class="output">Deploy a mission from Headquarters to begin.</pre></div>
+<div class="heading" style="margin:19px 0 8px"><h2>Live output</h2><button class="tiny outline" onclick="copyOutput()">COPY</button></div><pre id="missionOutput" class="output">Deploy a mission from Headquarters to begin.</pre>
+<div id="artifactActions" class="action-row" style="display:none;margin-top:14px">
+<button onclick="playArtifact()">▶ PLAY GENERATED APP</button>
+<button class="secondary" onclick="saveArtifact()">↓ SAVE HTML FILE</button>
+</div>
+<div id="artifactNote" class="note" style="display:none">The app is AI-generated and has not been functionally tested. The isolated preview has no network or access to your API keys.</div></div>
 </section>
 <section id="vault" class="section">
 <div class="overline">SECURE SETTINGS // KEYSTORE</div><h1>Model <em>vault.</em></h1>
@@ -150,7 +162,7 @@ details{margin-top:10px}summary{cursor:pointer;color:#f1a0b2;font-size:12px;font
 <button data-tab="history" onclick="showTab('history')"><span class="glyph">▤</span>HISTORY</button>
 </nav>
 <script>
-let state={history:[],busy:false,has_gemini:false,has_groq:false,has_github:false,has_bluesky:false};let team="Engineering",lastText="",toastTimer;
+let state={history:[],busy:false,has_gemini:false,has_groq:false,has_github:false,has_bluesky:false};let team="Engineering",lastText="",lastArtifactId="",toastTimer;
 const $=id=>document.getElementById(id);
 function showTab(name){document.querySelectorAll('.section').forEach(e=>e.classList.toggle('active',e.id===name));document.querySelectorAll('.nav button').forEach(e=>e.classList.toggle('active',e.dataset.tab===name));scrollTo(0,0)}
 function toast(s,kind){const t=$('toast');t.textContent=s;t.style.display='block';t.style.borderColor=kind==='bad'?'#fd4b71':'#396d59';clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.display='none',6500)}
@@ -182,7 +194,15 @@ function launchMission(){let goal=$('goal').value.trim(),p=$('missionProvider').
 if(!state['has_'+p]){toast('Add a '+p+' API key in Vault first.','bad');showTab('vault');return}
 for(let i=1;i<=3;i++)$('stage'+i).textContent='WAITING';
 $('missionOutput').textContent='Starting mission: '+goal+'\n';lastText='';$('runBadge').textContent='RUNNING';$('runBadge').className='badge';$('launchBtn').disabled=true;$('cancelBtn').style.display='';
-Crimson.saveOption('provider',p);Crimson.runMission(goal,team,p);showTab('missions')}
+$('artifactActions').style.display='none';$('artifactNote').style.display='none';lastArtifactId='';
+const selected=$('missionType').value;
+const isWeb=selected==='webapp'||(selected==='auto' && /\b(game|tic[ -]?tac[ -]?toe|web[ -]?app|website|webpage|calculator|interactive[ -]?page)\b/i.test(goal)&& /\b(build|create|make|code|develop|generate|implement|write)\b/i.test(goal));
+Crimson.saveOption('provider',p);
+if(isWeb)Crimson.runWebAppMission(goal,team,p);
+else Crimson.runMission(goal,team,p);
+showTab('missions')}
+function playArtifact(){if(!lastArtifactId){toast('There is no generated app to play','bad');return;}Crimson.previewArtifact(lastArtifactId)}
+function saveArtifact(){if(!lastArtifactId){toast('There is no project to export','bad');return;}Crimson.exportArtifact(lastArtifactId)}
 function copyOutput(){if(!lastText){toast('No finished output to copy','bad');return}const txt=lastText;const box=document.createElement('textarea');box.value=txt;document.body.appendChild(box);box.select();const ok=document.execCommand('copy');box.remove();toast(ok?'Copied output':'Copy unavailable; long-press to select text',ok?'good':'bad')}
 function githubDispatch(){const repo=$('gitRepo').value,workflow=$('gitWorkflow').value,ref=$('gitRef').value;if(!repo||!workflow){toast('Enter repository and workflow filename','bad');return}if(confirm('Dispatch '+workflow+' in '+repo+' on '+ref+'?'))Crimson.dispatchGithub(repo,workflow,ref)}
 function runWebhook(){const url=$('hookUrl').value;if(!url.startsWith('https://')){toast('A secure HTTPS webhook URL is required','bad');return}if(confirm('Send a POST request to this webhook URL?'))Crimson.sendWebhook(url,$('hookMessage').value)}
@@ -190,7 +210,14 @@ function blueskyConfirm(){const txt=$('bskyText').value.trim();if(!txt){toast('W
 function clearArchive(){if(confirm('Permanently delete all locally stored mission history?'))Crimson.clearHistory()}
 function renderHistory(){const list=$('historyList');list.textContent='';const items=state.history||[];
 if(!items.length){list.className='empty';list.textContent='No missions recorded yet.';return;}list.className='';
-items.forEach(m=>{const d=document.createElement('div');d.className='listitem';const line=document.createElement('div');line.className='inline';const name=document.createElement('b');name.textContent=m.goal||'Untitled';const badge=document.createElement('span');badge.className='badge '+(m.status==='completed'?'green':'gray');badge.textContent=(m.status||'unknown').toUpperCase();line.append(name,badge);const date=document.createElement('div');date.className='date';date.textContent=(m.createdAt||'')+' · '+(m.division||'')+' · '+(m.provider||'');const det=document.createElement('details');const sum=document.createElement('summary');sum.textContent='View result / audit';const pre=document.createElement('pre');pre.className='output';pre.textContent=m.result||m.error||'No result';det.append(sum,pre);d.append(line,date,det);list.append(d)})}
+items.forEach(m=>{const d=document.createElement('div');d.className='listitem';const line=document.createElement('div');line.className='inline';const name=document.createElement('b');name.textContent=m.goal||'Untitled';const badge=document.createElement('span');badge.className='badge '+(m.status==='completed'?'green':'gray');badge.textContent=(m.status||'unknown').toUpperCase();line.append(name,badge);const date=document.createElement('div');date.className='date';date.textContent=(m.createdAt||'')+' · '+(m.division||'')+' · '+(m.provider||'');const det=document.createElement('details');const sum=document.createElement('summary');sum.textContent='View result / audit';const pre=document.createElement('pre');pre.className='output';pre.textContent=m.result||m.error||'No result';det.append(sum,pre);d.append(line,date,det);
+if(m.artifactId){
+ const row=document.createElement('div');row.className='action-row';row.style.marginTop='12px';
+ const play=document.createElement('button');play.textContent='▶ PLAY APP';play.onclick=()=>Crimson.previewArtifact(m.artifactId);
+ const save=document.createElement('button');save.textContent='↓ SAVE HTML';save.className='secondary';save.onclick=()=>Crimson.exportArtifact(m.artifactId);
+ row.append(play,save);d.append(row);
+}
+list.append(d)})}
 function nativeEvent(e){
 switch(e.type){
 case 'snapshot':refresh(e);break;
@@ -202,7 +229,13 @@ let n=e.stage,st=$('stage'+n);st.textContent=e.message==='Completed'?'DONE':'RUN
 if(e.text){lastText=e.text;$('missionOutput').textContent='STAGE '+n+' — '+e.role.toUpperCase()+'\n\n'+e.text}
 else $('missionOutput').textContent+='\n'+e.role+': '+e.message;break}
 case 'mission_done':{
-refresh(e.snapshot);let m=e.mission;$('runBadge').textContent='COMPLETED';$('runBadge').className='badge green';lastText=m.result||'';$('missionOutput').textContent='FINAL AUDIT • '+m.division.toUpperCase()+'\n\n'+lastText;toast('Mission complete: '+m.durationSeconds+' seconds');break}
+refresh(e.snapshot);let m=e.mission;
+$('runBadge').textContent=m.artifactId?'APP CREATED':'REPORT COMPLETE';$('runBadge').className='badge green';
+lastText=m.result||'';$('missionOutput').textContent=(m.artifactId?'WEB APP GENERATED':'FINAL REPORT')+' • '+m.division.toUpperCase()+'\n\n'+lastText;
+lastArtifactId=m.artifactId||'';
+$('artifactActions').style.display=m.artifactId?'flex':'none';
+$('artifactNote').style.display=m.artifactId?'block':'none';
+toast(m.artifactId?'Runnable HTML project saved. Tap PLAY APP or SAVE HTML.':'Report complete: '+m.durationSeconds+' seconds');break}
 case 'idle':$('launchBtn').disabled=false;$('cancelBtn').style.display='none';break;
 case 'github_repos':{$('githubResults').textContent='';const rs=e.repositories||[];if(!rs.length){$('githubResults').textContent='No repositories returned.';break}
 rs.forEach(r=>{let row=document.createElement('div');row.className='external';let text=document.createElement('strong');text.textContent=r.name+' ('+r.visibility+')';let btn=document.createElement('button');btn.className='tiny secondary';btn.textContent='SELECT';btn.onclick=()=>{$('gitRepo').value=r.name;toast('Selected '+r.name)};row.append(text,btn);$('githubResults').append(row)});toast('Loaded '+rs.length+' repositories');break}
