@@ -401,14 +401,22 @@ public class MainActivity extends Activity {
                 emit("mission_progress",obj("stage",2,"role","Specialist","message","Completed","text","Executable HTML source generated ("+candidate.length()+" characters)."));
                 if(cancelled)throw new Exception("Mission cancelled.");
                 emit("mission_progress",obj("stage",3,"role","Quality auditor","message","Reviewing code and producing corrected complete file..."));
-                String revised = invoke(provider,
-                    "You are a code reviewer and repair engineer. Review this single-file HTML app for broken event handlers, state bugs, gameplay logic, null DOM elements, invalid JS, and mobile usability. "+
-                    "RETURN ONLY THE COMPLETE CORRECTED HTML DOCUMENT, no explanation and no markdown fences. "+
-                    "Do not delete functionality and do not use external network resources. Request: "+goal+"\nSOURCE:\n"+candidate,7800);
-                String finalHtml;
+                String finalHtml=candidate;
                 String auditNote;
-                try {finalHtml=extractHtml(revised);auditNote="The independent AI reviewer returned revised source. No actual runtime testing was performed.";}
-                catch(Exception ex){finalHtml=candidate;auditNote="Reviewer did not return complete code. Kept specialist's generated file; runtime remains untested.";}
+                try {
+                    String revised=invoke(provider,
+                        "You are a code reviewer and repair engineer. Review this single-file HTML app for broken event handlers, state bugs, gameplay logic, null DOM elements, invalid JS, and mobile usability. "+
+                        "RETURN ONLY THE COMPLETE CORRECTED HTML DOCUMENT, no explanation and no markdown fences. "+
+                        "Do not delete functionality and do not use external network resources. Request: "+goal+"\\nSOURCE:\\n"+candidate,7800);
+                    try {
+                        finalHtml=extractHtml(revised);
+                        auditNote="The AI reviewer returned revised source. Interactive functionality is not guaranteed and has not been tested.";
+                    } catch(Exception invalid) {
+                        auditNote="The reviewer returned incomplete/non-code text. Kept the specialist's generated HTML; runtime is untested.";
+                    }
+                } catch(Exception reviewError) {
+                    auditNote="Code reviewer was unavailable or rate-limited. Kept the specialist's generated HTML; runtime is untested.";
+                }
                 steps.put(obj("role","Quality auditor","text",auditNote));
                 emit("mission_progress",obj("stage",3,"role","Quality auditor","message","Completed","text",auditNote));
                 if(cancelled)throw new Exception("Mission cancelled.");
