@@ -1,0 +1,36 @@
+name: Build Crimson Command APK
+on:
+  push:
+    branches: [crimson-command-apk]
+    paths:
+      - 'crimson-android/**'
+      - '.github/workflows/build-crimson-command.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compile signed installable debug APK
+        working-directory: crimson-android
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Verify APK exists
+        run: test -s crimson-android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Export Crimson Command APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Crimson-Command-Android-APK
+          path: crimson-android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
