@@ -1,7 +1,7 @@
 name: Build Crimson Command Standalone APK
 on:
   push:
-    branches: [crimson-command-apk, crimson-command-standalone]
+    branches: [crimson-command-apk, crimson-command-standalone, crimson-command-artifacts]
     paths:
       - 'crimson-android/**'
       - '.github/workflows/build-crimson-command.yml'
@@ -31,6 +31,6 @@ jobs:
       - name: Export Crimson Command APK
         uses: actions/upload-artifact@v4
         with:
-          name: Crimson-Command-Standalone-Android-APK
+          name: Crimson-Command-Playable-Android-APK
           path: crimson-android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
