@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#08070b"><title>Crimson Command</title>
+<style>
+:root{color-scheme:dark;--bg:#08070b;--surface:#111015;--sub:#171319;--line:#31232b;--red:#eb254b;--red2:#b71434;--txt:#f5eff2;--muted:#9d919b}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 100% -8%,#44131c90 0%,transparent 42%),linear-gradient(180deg,#0b080e 0%,#08070b 90%);color:var(--txt);font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;min-height:100svh}
+body:before{content:'';position:fixed;inset:0;pointer-events:none;opacity:.11;background-image:linear-gradient(#f3285022 1px,transparent 1px),linear-gradient(90deg,#f3285022 1px,transparent 1px);background-size:36px 36px;mask-image:linear-gradient(#000,transparent 83%)}
+main{max-width:840px;margin:auto;padding:calc(env(safe-area-inset-top) + 24px) 20px calc(env(safe-area-inset-bottom) + 60px);position:relative}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:30px}
+.logo{width:48px;height:48px;border-radius:13px;background:linear-gradient(140deg,#ed2a51,#8a102b);display:flex;align-items:center;justify-content:center;box-shadow:0 0 30px #e12a4f38;font-weight:900;letter-spacing:-3px;font-size:20px;padding-right:4px}
+.brand{display:flex;align-items:center;gap:12px}
+.word{font-weight:900;letter-spacing:1.4px;font-size:16px;line-height:1.15}
+.word small{display:block;color:#e66880;font-size:10px;letter-spacing:3px;margin-top:5px;font-weight:700}
+.tag{color:#f593a5;background:#4b1325;border:1px solid #8b203a;border-radius:999px;padding:6px 9px;font-size:10px;letter-spacing:1px;font-weight:900}
+.kicker{letter-spacing:2.5px;color:#f04b6d;font-weight:800;font-size:10px;margin:26px 0 12px}
+h1{font-weight:900;letter-spacing:-2.2px;line-height:1.05;font-size:clamp(39px,9vw,67px);margin:0 0 16px}
+h1 span{color:#ee2852}
+.lead{font-size:15px;color:#b0a4ac;max-width:570px;margin:0 0 27px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:26px 0}
+.metric{border:1px solid #30222b;background:#181019ab;padding:14px 8px;border-radius:10px;text-align:center}
+.metric strong{display:block;font-size:19px;font-weight:900;color:#fff}
+.metric small{display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#ab9aa4;margin-top:2px}
+.card{background:linear-gradient(135deg,#151116,#100e13);border:1px solid #38232e;border-radius:16px;padding:20px;margin:15px 0;box-shadow:0 10px 36px #0002}
+.card-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.number{display:inline-grid;place-items:center;background:#40202b;color:#ff6d86;width:29px;height:29px;border-radius:9px;font-size:12px;font-weight:900}
+h2{font-size:17px;margin:0;font-weight:800}
+p{color:#ac9ea8;margin:5px 0 13px}
+label{font-size:11px;display:block;color:#d1bdc7;font-weight:800;letter-spacing:1.1px;margin:14px 0 8px}
+input,select,textarea{background:#09080c;color:#f5ecf0;border:1px solid #49323c;border-radius:10px;padding:14px 13px;width:100%;font:inherit;outline:none}
+input:focus,select:focus,textarea:focus{border-color:#eb3557;box-shadow:0 0 0 3px #e1274b22}
+textarea{resize:vertical;min-height:90px}
+button{border:none;color:#fff;background:linear-gradient(120deg,#f02b53,#b51539);border-radius:10px;padding:14px 18px;font:inherit;font-weight:850;cursor:pointer;width:100%;margin-top:12px}
+button:disabled{opacity:.5}
+button.alt{background:#291923;border:1px solid #673041;color:#efaabd}
+.notice{border:1px solid #5b3844;border-radius:10px;padding:11px 13px;color:#bfa9b3;background:#201219;font-size:12px;margin-top:14px}
+.ok{border-color:#22694e;color:#9ee1be;background:#0e2820}
+.error{border-color:#a22a48;color:#ffc5cf;background:#35131f}
+.lines{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.minicard{background:#1b151c;border:1px solid #30212b;padding:13px;border-radius:11px}
+.minicard strong{display:block;font-size:12px;margin-bottom:4px}
+.minicard span{font-size:11px;color:#a99aa4}
+.step{display:flex;align-items:center;gap:8px;color:#c2b4bf;font-size:12px;padding:6px 0}
+.dot{width:8px;height:8px;border-radius:50%;background:#e5264c;box-shadow:0 0 12px #e5264caa}
+.footer{font-size:10px;color:#7f737c;margin:30px 0 0;text-align:center;letter-spacing:1.3px}
+a{color:#f38195}
+details{margin-top:12px}summary{cursor:pointer;color:#e1b0bc;font-weight:700}
+#result{white-space:pre-wrap;line-height:1.55;background:#0b0a0e;border:1px solid #48303b;border-radius:10px;padding:14px;max-height:400px;overflow:auto;display:none;margin-top:12px;color:#e2dae0}
+@media (min-width:640px){main{padding-top:38px}.metrics{gap:14px}.card{padding:26px}}
+</style>
+</head>
+<body><main>
+<div class="top"><div class="brand"><div class="logo">CC</div><div class="word">CRIMSON<small>COMMAND</small></div></div><span class="tag">ANDROID NATIVE</span></div>
+<div class="kicker">YOUR AI OPERATIONS HQ // 01</div>
+<h1>Control the <span>machine.</span></h1>
+<p class="lead">Your command center for managing agent teams, missions, workflows and integrations. Crimson and black. Zero software license fees. You own the infrastructure.</p>
+<div class="metrics">
+<div class="metric"><strong>12</strong><small>Connectors</small></div>
+<div class="metric"><strong>04</strong><small>Agent divisions</small></div>
+<div class="metric"><strong>$0</strong><small>License fee</small></div>
+</div>
+<section class="card">
+<div class="card-head"><span class="number">01</span><h2>Connect to your command server</h2></div>
+<p>The full dashboard runs against your existing Crimson Command backend. Enter the origin where it's hosted. This APK itself does not host the Node.js agent engine.</p>
+<label for="url">SERVER URL · HTTPS</label>
+<input id="url" type="url" placeholder="https://your-private-crimson-server.example" autocapitalize="none" autocomplete="url" spellcheck="false">
+<button id="connect" onclick="connect()">CONNECT TO COMMAND CENTER ↗</button>
+<div id="msg" class="notice">Your password stays on the server. The app tests the API before connecting and never accepts invalid TLS certificates.</div>
+<details><summary>How do I get a server address?</summary><p>Run the included Crimson Command Node.js server on an existing computer or a trusted host. Place it behind HTTPS with private access, then enter its URL above. A locally running backend on this phone can use http://127.0.0.1:8787.</p><p>Do not open the development server directly to the public Internet.</p></details>
+</section>
+<section class="card">
+<div class="card-head"><span class="number">02</span><h2>Your integrations, one command center</h2></div>
+<div class="lines">
+<div class="minicard"><strong>◉ Agent teams</strong><span>CrewAI · LangGraph · Microsoft Agent Framework</span></div>
+<div class="minicard"><strong>⌘ Coding & orchestration</strong><span>Paperclip · OpenHands · OpenClaw</span></div>
+<div class="minicard"><strong>⚡ Automations</strong><span>n8n · GitHub Actions · Bluesky</span></div>
+<div class="minicard"><strong>◆ AI models</strong><span>Gemini · Groq · Ollama</span></div>
+</div>
+<div class="notice">Each third-party system must be installed or have its own API credentials. Free-tier providers impose quota limits.</div>
+</section>
+<div class="footer">CRIMSON COMMAND 1.1.0 · NATIVE ANDROID CLIENT · LOCAL-FIRST</div>
+</main>
+<script>
+const url=document.getElementById('url'),msg=document.getElementById('msg'),btn=document.getElementById('connect');
+try{url.value=CrimsonNative.savedServer()||'';}catch(e){msg.textContent='Native Android bridge unavailable.';}
+function connect(){let v=url.value.trim();if(!v){connectionFailed('Enter your server URL.');return;}btn.disabled=true;btn.textContent='VERIFYING SECURE CONNECTION…';msg.className='notice';msg.textContent='Connecting to Crimson Command API…';try{CrimsonNative.connect(v)}catch(e){connectionFailed(String(e))}}
+function connectionFailed(s){btn.disabled=false;btn.textContent='CONNECT TO COMMAND CENTER ↗';msg.className='notice error';msg.textContent=s}
+</script>
+</body></html>
