@@ -27,6 +27,7 @@ import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.security.KeyStore;
 import java.security.SecureRandom;
@@ -98,7 +99,7 @@ public class MainActivity extends Activity {
     }
     private void emitError(String context, Exception err) {
         String msg = err.getMessage();
-        if (msg == null || msg.isBlank()) msg = "Unknown error";
+        if (msg == null || msg.trim().isEmpty()) msg = "Unknown error";
         emit("error", obj("context", context, "message", msg.length() > 700 ? msg.substring(0,700) : msg));
     }
     private static JSONObject obj(Object... args) {
@@ -163,7 +164,12 @@ public class MainActivity extends Activity {
     private static String read(InputStream input, int limit) throws Exception {
         try (InputStream in=input) {
             if(in==null) return "";
-            return new String(in.readNBytes(limit), StandardCharsets.UTF_8);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[4096]; int n, total = 0;
+            while ((n = in.read(buf,0,Math.min(buf.length,limit-total))) > 0) {
+                out.write(buf,0,n);total+=n;if(total>=limit)break;
+            }
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
         }
     }
     private static String request(String method,String endpoint,String authHeader,String authValue, JSONObject body) throws Exception {
@@ -299,7 +305,7 @@ public class MainActivity extends Activity {
                 String token=key("github");
                 if(token.isEmpty())throw new Exception("Connect GitHub first.");
                 String full=safeRepo(repo),wf=safeWorkflow(workflow),ref=branch.trim();
-                if(!ref.matches("[a-zA-Z0-9_.\/-]{1,120}")||ref.contains(".."))throw new Exception("Invalid Git ref");
+                if(!ref.matches("[a-zA-Z0-9_./-]{1,120}")||ref.contains(".."))throw new Exception("Invalid Git ref");
                 request("POST","https://api.github.com/repos/"+full+"/actions/workflows/"+wf+"/dispatches",
                     "Authorization","Bearer "+token,obj("ref",ref));
                 emit("success",obj("context","github","message","GitHub workflow dispatched. Check GitHub Actions for execution status."));
@@ -325,7 +331,7 @@ public class MainActivity extends Activity {
                 String handle=prefs.getString("bluesky_handle","").trim();
                 String password=key("bluesky");
                 if(handle.isEmpty()||password.isEmpty())throw new Exception("Connect Bluesky handle and app password first.");
-                if(text.isBlank()||text.codePointCount(0,text.length())>300)throw new Exception("Post must contain 1–300 Unicode characters.");
+                if(text.trim().isEmpty()||text.codePointCount(0,text.length())>300)throw new Exception("Post must contain 1–300 Unicode characters.");
                 String login=request("POST","https://bsky.social/xrpc/com.atproto.server.createSession",null,null,
                     obj("identifier",handle,"password",password));
                 JSONObject session=new JSONObject(login);
@@ -369,8 +375,7 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void runMission(String goal,String division,String provider) {
             if(goal==null||goal.trim().length()<5||goal.length()>2500){emit("error",obj("context","mission","message","Mission description must be 5–2500 characters."));return;}
-            if(!new String[]{"Engineering","Marketing","Research","Operations"}.equals(division)
-                 && !("Engineering".equals(division)||"Marketing".equals(division)||"Research".equals(division)||"Operations".equals(division))) {
+            if(!("Engineering".equals(division)||"Marketing".equals(division)||"Research".equals(division)||"Operations".equals(division))) {
                 emit("error",obj("context","mission","message","Unknown agent division."));return;
             }
             if(!"gemini".equals(provider)&&!"groq".equals(provider)){emit("error",obj("context","mission","message","Choose Gemini or Groq."));return;}
