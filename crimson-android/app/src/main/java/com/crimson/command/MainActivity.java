@@ -27,6 +27,10 @@ import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.io.InputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileInputStream;
+import java.util.Locale;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.security.KeyStore;
@@ -49,6 +53,8 @@ public class MainActivity extends Activity {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private volatile boolean cancelled = false;
+    private String pendingExportId = null;
+    private static final int EXPORT_REQUEST = 994;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -200,7 +206,8 @@ public class MainActivity extends Activity {
         }
         return response;
     }
-    private String invoke(String provider,String prompt) throws Exception {
+    private String invoke(String provider,String prompt) throws Exception { return invoke(provider,prompt,1600); }
+    private String invoke(String provider,String prompt,int maxTokens) throws Exception {
         String credential=key(provider);
         if(credential.isEmpty()) throw new Exception("Connect "+provider+" in the Vault before running AI missions.");
         if(provider.equals("gemini")) {
@@ -208,7 +215,7 @@ public class MainActivity extends Activity {
             if(!model.matches("[a-zA-Z0-9._-]{2,75}")) throw new Exception("Invalid Gemini model ID");
             String endpoint="https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent";
             JSONObject body=obj("contents",new JSONArray().put(obj("parts",new JSONArray().put(obj("text",prompt)))),
-                "generationConfig",obj("temperature",0.5,"maxOutputTokens",1600));
+                "generationConfig",obj("temperature",0.35,"maxOutputTokens",maxTokens));
             String response=request("POST",endpoint,"x-goog-api-key",credential,body);
             JSONObject json=new JSONObject(response);
             JSONArray parts=json.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts");
@@ -221,7 +228,7 @@ public class MainActivity extends Activity {
             if(!model.matches("[a-zA-Z0-9._/-]{2,90}")) throw new Exception("Invalid Groq model ID");
             JSONObject body=obj("model",model,
                 "messages",new JSONArray().put(obj("role","user","content",prompt)),
-                "temperature",0.5,"max_tokens",1600);
+                "temperature",0.35,"max_tokens",maxTokens);
             JSONObject json=new JSONObject(request("POST","https://api.groq.com/openai/v1/chat/completions",
                 "Authorization","Bearer "+credential,body));
             return json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
@@ -347,6 +354,98 @@ public class MainActivity extends Activity {
         });
     }
 
+
+    // Generated web projects are stored as actual private files; only an explicit user action exports them.
+    private String extractHtml(String raw) throws Exception {
+        String lower = raw.toLowerCase(Locale.ROOT);
+        int start = lower.indexOf("<!doctype html");
+        if (start < 0) start = lower.indexOf("<html");
+        int end = lower.lastIndexOf("</html>");
+        if (start < 0 || end < start) throw new Exception("The model returned a description, not a complete HTML document. Try a smaller project or a different model.");
+        String html = raw.substring(start,end+7);
+        String t = html.toLowerCase(Locale.ROOT);
+        if(html.length() < 200 || html.length() > 180000 || !t.contains("<body") || !t.contains("<script"))
+            throw new Exception("The response was not a complete runnable HTML/CSS/JavaScript app. No file was generated.");
+        if(t.contains("<script src=") || t.contains("http://") || t.contains("https://"))
+            throw new Exception("The generated project references online resources. Request a fully self-contained offline game.");
+        return html;
+    }
+    private File projectFile(String id) throws Exception {
+        if(id == null || !id.matches("[0-9]{10,16}")) throw new Exception("Invalid project identifier");
+        return new File(getFilesDir(),"crimson-project-"+id+".html");
+    }
+    private void runWebApp(String goal,String division,String provider){
+        if(!running.compareAndSet(false,true)){emit("error",obj("context","mission","message","A mission is already running."));return;}
+        cancelled=false;
+        executor.execute(()->{
+            long start=System.currentTimeMillis();
+            String id=String.valueOf(start);
+            JSONArray steps=new JSONArray();
+            String candidate="";
+            try{
+                emit("mission_started",obj("goal",goal,"division",division,"provider",provider,"deliverable","webapp"));
+                emit("mission_progress",obj("stage",1,"role","Strategist","message","Designing the game specification..."));
+                String plan = invoke(provider,
+                    "You are a practical lead software engineer. Return a SHORT (under 250 words) concrete implementation specification for a fully playable single-file offline HTML/CSS/JavaScript project. Include gameplay rules, mobile layout, interactions, win conditions and edge cases. No claims of execution. User request: "+goal,550);
+                steps.put(obj("role","Strategist","text",plan));
+                emit("mission_progress",obj("stage",1,"role","Strategist","message","Completed","text",plan));
+                if(cancelled)throw new Exception("Mission cancelled.");
+                emit("mission_progress",obj("stage",2,"role","Specialist","message","Writing executable HTML/CSS/JavaScript..."));
+                String built = invoke(provider,
+                    "You are an expert game/web application developer. Return ONLY complete standalone HTML5 source code starting with <!DOCTYPE html> and ending with </html>. "+
+                    "Embed all CSS and JS inline. No markdown fences, no explanations, no external dependencies, URLs, imports, CSS links, CDNs, image fetches or network calls. "+
+                    "The game MUST be functional, respond to taps, have a reset button, visible status/score, and mobile layout. "+
+                    "Write all code, not a description. Request: "+goal+"\nSpecification:\n"+plan,7800);
+                candidate=extractHtml(built);
+                steps.put(obj("role","Specialist","text","Produced "+candidate.length()+" characters of HTML/CSS/JavaScript."));
+                emit("mission_progress",obj("stage",2,"role","Specialist","message","Completed","text","Executable HTML source generated ("+candidate.length()+" characters)."));
+                if(cancelled)throw new Exception("Mission cancelled.");
+                emit("mission_progress",obj("stage",3,"role","Quality auditor","message","Reviewing code and producing corrected complete file..."));
+                String revised = invoke(provider,
+                    "You are a code reviewer and repair engineer. Review this single-file HTML app for broken event handlers, state bugs, gameplay logic, null DOM elements, invalid JS, and mobile usability. "+
+                    "RETURN ONLY THE COMPLETE CORRECTED HTML DOCUMENT, no explanation and no markdown fences. "+
+                    "Do not delete functionality and do not use external network resources. Request: "+goal+"\nSOURCE:\n"+candidate,7800);
+                String finalHtml;
+                String auditNote;
+                try {finalHtml=extractHtml(revised);auditNote="The independent AI reviewer returned revised source. No actual runtime testing was performed.";}
+                catch(Exception ex){finalHtml=candidate;auditNote="Reviewer did not return complete code. Kept specialist's generated file; runtime remains untested.";}
+                steps.put(obj("role","Quality auditor","text",auditNote));
+                emit("mission_progress",obj("stage",3,"role","Quality auditor","message","Completed","text",auditNote));
+                if(cancelled)throw new Exception("Mission cancelled.");
+                try(FileOutputStream file=new FileOutputStream(projectFile(id))){
+                    file.write(finalHtml.getBytes(StandardCharsets.UTF_8));
+                }
+                String summary="Created an interactive HTML project ("+finalHtml.length()+" characters). Tap PLAY APP to test it, or SAVE HTML to export it. "+auditNote;
+                JSONObject mission=obj("id",id,"goal",goal,"division",division,"provider",provider,"status","completed",
+                    "createdAt",Instant.ofEpochMilli(start).toString(),"durationSeconds",(System.currentTimeMillis()-start)/1000,
+                    "steps",steps,"result",summary,"artifactId",id,"artifactType","text/html","fileName","crimson-project-"+id+".html");
+                persistMission(mission);
+                emit("mission_done",obj("mission",mission,"snapshot",snapshot()));
+            }catch(Exception e){
+                emitError("mission",e);
+                try{persistMission(obj("id",id,"goal",goal,"division",division,"provider",provider,
+                    "status",cancelled?"cancelled":"failed","createdAt",Instant.ofEpochMilli(start).toString(),
+                    "error",e.getMessage()==null?"Unknown":e.getMessage(),"steps",steps));}
+                catch(Exception ignored){}
+                emit("snapshot",snapshot());
+            }finally{running.set(false);emit("idle",obj("busy",false));}
+        });
+    }
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+        super.onActivityResult(requestCode,resultCode,data);
+        if(requestCode!=EXPORT_REQUEST || pendingExportId==null)return;
+        String id=pendingExportId;pendingExportId=null;
+        if(resultCode!=RESULT_OK || data==null || data.getData()==null)return;
+        executor.execute(()->{
+            try(FileInputStream in=new FileInputStream(projectFile(id));
+                OutputStream out=getContentResolver().openOutputStream(data.getData())){
+                if(out==null)throw new Exception("Could not open the selected save destination.");
+                byte[] buf=new byte[8192];int n;
+                while((n=in.read(buf))!=-1)out.write(buf,0,n);
+                emit("success",obj("context","export","message","Saved the HTML project to your chosen location."));
+            }catch(Exception e){emitError("export",e);}
+        });
+    }
     public final class Bridge {
         @JavascriptInterface public String getSnapshot() {return snapshot().toString();}
         @JavascriptInterface public void saveCredential(String provider,String value) {
@@ -380,6 +479,35 @@ public class MainActivity extends Activity {
             }
             if(!"gemini".equals(provider)&&!"groq".equals(provider)){emit("error",obj("context","mission","message","Choose Gemini or Groq."));return;}
             runAgentMission(goal.trim(),division,provider);
+        }
+        @JavascriptInterface public void runWebAppMission(String goal,String division,String provider){
+            if(goal==null || goal.trim().length()<5 || goal.length()>1500){emit("error",obj("context","mission","message","Enter a project description between 5 and 1500 characters."));return;}
+            if(!"gemini".equals(provider)&&!"groq".equals(provider)){emit("error",obj("context","mission","message","Choose Gemini or Groq."));return;}
+            runWebApp(goal.trim(),division,provider);
+        }
+        @JavascriptInterface public void previewArtifact(String id){
+            runOnUiThread(()->{
+                try{
+                    File f=projectFile(id);
+                    if(!f.isFile()){toast("Project file missing");return;}
+                    Intent intent=new Intent(MainActivity.this,PreviewActivity.class);
+                    intent.putExtra("artifactId",id);
+                    startActivity(intent);
+                }catch(Exception e){toast("Preview unavailable: "+e.getMessage());}
+            });
+        }
+        @JavascriptInterface public void exportArtifact(String id){
+            runOnUiThread(()->{
+                try{
+                    if(!projectFile(id).isFile()){toast("Project file missing");return;}
+                    pendingExportId=id;
+                    Intent save=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                    save.addCategory(Intent.CATEGORY_OPENABLE);
+                    save.setType("text/html");
+                    save.putExtra(Intent.EXTRA_TITLE,"crimson-project-"+id+".html");
+                    startActivityForResult(save,EXPORT_REQUEST);
+                }catch(Exception e){toast("Export unavailable: "+e.getMessage());}
+            });
         }
         @JavascriptInterface public void cancelMission(){cancelled=true;}
         @JavascriptInterface public void listGitHub(){githubRepos();}
